@@ -22,9 +22,11 @@ Input::~Input()
 
 #define STRINGIFY(A) #A
 
-bool Input::setup(int device_id)
+bool Input::setup(int device_id, bool useTexture)
 {
 	close();
+    
+    this->useTexture = useTexture;
 	
 	string frag = STRINGIFY
 	(
@@ -295,35 +297,36 @@ bool Input::setup(int device_id)
      }
      );
     
-    if(ofIsGLProgrammableRenderer()){
-        shader.setupShaderFromSource(GL_VERTEX_SHADER, vert150);
-        shader.setupShaderFromSource(GL_FRAGMENT_SHADER, frag150);
-        shader.bindDefaults();
-        
-        shader_prog.setupShaderFromSource(GL_VERTEX_SHADER, vert150);
-        shader_prog.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_prog150);
-        shader_prog.bindDefaults();
-        
-        shader_argb.setupShaderFromSource(GL_VERTEX_SHADER, vert150);
-        shader_argb.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_argb_150);
-        shader_argb.bindDefaults();
-        
-        shader_argb_prog.setupShaderFromSource(GL_VERTEX_SHADER, vert150);
-        shader_argb_prog.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_argb_prog_150);
-        shader_argb_prog.bindDefaults();
-        
-    }else{
-        shader.setupShaderFromSource(GL_FRAGMENT_SHADER, frag);
-        shader_prog.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_prog);
-        
-        shader_argb.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_argb);
-        shader_argb_prog.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_argb_prog);
+    if(useTexture) {
+        if(ofIsGLProgrammableRenderer()){
+            shader.setupShaderFromSource(GL_VERTEX_SHADER, vert150);
+            shader.setupShaderFromSource(GL_FRAGMENT_SHADER, frag150);
+            shader.bindDefaults();
+            
+            shader_prog.setupShaderFromSource(GL_VERTEX_SHADER, vert150);
+            shader_prog.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_prog150);
+            shader_prog.bindDefaults();
+            
+            shader_argb.setupShaderFromSource(GL_VERTEX_SHADER, vert150);
+            shader_argb.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_argb_150);
+            shader_argb.bindDefaults();
+            
+            shader_argb_prog.setupShaderFromSource(GL_VERTEX_SHADER, vert150);
+            shader_argb_prog.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_argb_prog_150);
+            shader_argb_prog.bindDefaults();
+            
+        }else{
+            shader.setupShaderFromSource(GL_FRAGMENT_SHADER, frag);
+            shader_prog.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_prog);
+            
+            shader_argb.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_argb);
+            shader_argb_prog.setupShaderFromSource(GL_FRAGMENT_SHADER, frag_argb_prog);
+        }
+        shader.linkProgram();
+        shader_prog.linkProgram();
+        shader_argb.linkProgram();
+        shader_argb_prog.linkProgram();
     }
-    shader.linkProgram();
-    shader_prog.linkProgram();
-    shader_argb.linkProgram();
-    shader_argb_prog.linkProgram();
-
     
 	this->device_id = device_id;
 
@@ -408,13 +411,15 @@ bool Input::start(BMDDisplayMode mode, bool use_rgb_colorspace)
         return false;
     }
 	
-	shader.begin();
-	shader.setUniform1i("use_odd", 0);
-	shader.end();
-	
-    shader_argb.begin();
-    shader_argb.setUniform1i("use_odd", 0);
-    shader_argb.end();
+    if (useTexture) {
+        shader.begin();
+        shader.setUniform1i("use_odd", 0);
+        shader.end();
+        
+        shader_argb.begin();
+        shader_argb.setUniform1i("use_odd", 0);
+        shader_argb.end();
+    }
     
 	return true;
 }
@@ -641,6 +646,8 @@ HRESULT Input::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents notifica
     
     // Start video capture
     pDLInput->StartStreams();
+    
+    return S_OK;
 }
 
 HRESULT Input::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFrame, IDeckLinkAudioInputPacket* audioPacket)
@@ -682,14 +689,11 @@ HRESULT Input::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFrame, IDec
 
 void Input::update()
 {
-	if (ofGetFrameNum() != lastFrameNo)
-	{
-		bNewFrame = false;
-		lastFrameNo = ofGetFrameNum();
-	}	
 	if (bNewBuffer) {
 		mutex->lock();
-		tex.loadData(pix_front);
+        if (useTexture) {
+            tex.loadData(pix_front);
+        }
         tc_front = tc_back;
         bNewBuffer = false;
 		mutex->unlock();
@@ -780,6 +784,9 @@ void Input::draw(float x, float y) const
 
 void Input::draw(float x, float y, float w, float h) const
 {
+    if (!useTexture) {
+        return;
+    }
     if (b_use_rgb_colorspace) {
         bool bprog = draw_mode == DRAWMODE_PROGRESSIVE;
         const ofShader* s = bprog ? &shader_argb_prog : &shader_argb;

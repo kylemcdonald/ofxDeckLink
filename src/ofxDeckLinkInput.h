@@ -18,7 +18,7 @@ public:
 	Input();
 	~Input();
 	
-	bool setup(int device_id = 0);
+	bool setup(int device_id = 0, bool useTexture = true);
 	void close();
 	
 	void listDisplayMode();
@@ -46,6 +46,7 @@ public:
 	uint64_t getTimestamp() const { return timestamp; }
 
 	bool isFrameNew() const { return bNewFrame; }
+    void markFrameOld() { bNewFrame = false; }
 	
 	void draw(float x, float y) const;
 	void draw(float x, float y, float w, float h) const;
@@ -100,6 +101,7 @@ protected:
 	ofPixels pix_front;
 	ofPixels pix_back;
     
+    bool useTexture;
     ofTexture tex;
 	ofShader shader;
 	ofShader shader_prog;
